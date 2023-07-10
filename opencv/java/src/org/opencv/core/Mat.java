@@ -745,7 +745,7 @@ public class Mat {
     @Override
     public String toString() {
         String _dims = (dims() > 0) ? "" : "-1*-1*";
-        for (int i=0; i<dims(); i++) {
+        for (int i = 0; i < dims(); i++) {
             _dims += size(i) + "*";
         }
         return "Mat [ " + _dims + CvType.typeToString(type()) +

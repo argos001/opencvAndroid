@@ -11,11 +11,14 @@ import org.opencv.android.InstallCallbackInterface;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
 import org.opencv.core.DMatch;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfDMatch;
 import org.opencv.core.MatOfKeyPoint;
+import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
@@ -43,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
                 case LoaderCallbackInterface.SUCCESS: {
                     Log.e(TAG, "OpenCV loaded successfully");
                     cameraBridgeViewBase.enableView();
+
                 }
                 break;
                 default:
@@ -86,7 +90,14 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onCameraViewStarted(int width, int height) {
                 Log.e(TAG, "onCameraViewStarted: ");
-                initMyProcessors();
+//                initMyProcessors();
+                try {
+                    needToDetect = Utils.loadResource(MainActivity.this, R.drawable.banana);
+                    Imgproc.cvtColor(needToDetect, needToDetect, Imgproc.COLOR_RGB2GRAY);
+                    Log.e(TAG, "onCameraViewStarted: " + needToDetect.width());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
             }
 
             @Override
@@ -97,13 +108,84 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public Mat onCameraFrame(Mat inputFrame) {
-                Log.e(TAG, "onCameraFrame: ");
+//                Log.e(TAG, "onCameraFrame: ");
 //                return inputFrame;
 //                return processImage(inputFrame);
-                return detectMyImage(inputFrame);
+//                return detectMyImage(inputFrame);
+//                return detection2(inputFrame);
+                return detection3(inputFrame);
             }
 
         });
+
+    }
+
+
+    private Point matchLoc;
+    private Core.MinMaxLocResult mmr;
+
+    private Mat detection3(Mat inputFrame) {
+
+        if (needToDetect.empty())
+            return inputFrame;
+
+        Mat source = inputFrame.clone();
+        Imgproc.cvtColor(source, source, Imgproc.COLOR_RGB2GRAY);
+        int resCols = source.cols() - needToDetect.cols() + 1;
+        int resRows = source.rows() - needToDetect.rows() + 1;
+        Mat result = new Mat(resRows, resCols, CvType.CV_32FC1);
+
+        Imgproc.matchTemplate(source, needToDetect, result, Imgproc.TM_CCOEFF);
+//        Imgproc.threshold(result, result, 0.9, 1, Imgproc.THRESH_TOZERO);
+        Core.normalize(result, result, 0, 1, Core.NORM_MINMAX, -1, new Mat());
+        if (result.empty())
+            return inputFrame;
+        Core.MinMaxLocResult mmr = Core.minMaxLoc(result);
+
+        Point matchLoc = mmr.minLoc;
+        Log.e(TAG, "detection3: " + mmr.maxVal + " " + mmr.minVal);
+        Imgproc.rectangle(inputFrame, matchLoc, new Point(matchLoc.x + needToDetect.cols(), matchLoc.y + needToDetect.rows()), new Scalar(0, 255, 0));
+
+
+        return inputFrame;
+
+    }
+
+    private Mat detection2(Mat inputFrame) {
+        if (needToDetect.empty())
+            return inputFrame;
+
+        Mat source = inputFrame.clone();
+        Imgproc.cvtColor(source, source, Imgproc.COLOR_RGB2GRAY);
+
+        int result_cols = source.cols() - needToDetect.cols() + 1;
+        int result_rows = source.rows() - needToDetect.rows() + 1;
+        Mat result = new Mat(result_rows, result_cols, CvType.CV_32FC1);
+
+        Imgproc.matchTemplate(source, needToDetect, result, Imgproc.TM_CCORR_NORMED);
+        Imgproc.threshold(result, result, 0.9, 1, Imgproc.THRESH_TOZERO);
+
+//        while (true) {
+//            mmr = Core.minMaxLoc(result);
+//            matchLoc = mmr.maxLoc;
+//            Log.e(TAG, "detection2: " + mmr.maxVal);
+//            if (mmr.maxVal >= 0.9) {
+//                Imgproc.rectangle(inputFrame, matchLoc, new Point(matchLoc.x + needToDetect.cols(), matchLoc.y + needToDetect.rows()), new Scalar(0, 255, 0));
+//                Log.e(TAG, "detection2: detected");
+//                break;
+//            } else
+//                break;
+//        }
+        mmr = Core.minMaxLoc(result);
+        matchLoc = mmr.minLoc;
+        Log.e(TAG, "detection2: " + mmr.minVal);
+        if (mmr.minVal >= 0.9) {
+            Imgproc.rectangle(inputFrame, matchLoc, new Point(matchLoc.x + needToDetect.cols(), matchLoc.y + needToDetect.rows()), new Scalar(0, 255, 0), 5);
+        }
+
+//        result = null;
+
+        return inputFrame;
 
     }
 
@@ -135,20 +217,26 @@ public class MainActivity extends AppCompatActivity {
     private Mat descriptors1, descriptors2;
     private MatOfKeyPoint keyPoint1, keyPoint2;
 
+    private Mat needToDetect;
+
     private void initMyProcessors() {
-        detector = FeatureDetector.create(FeatureDetector.ORB);
-        descriptor = DescriptorExtractor.create(DescriptorExtractor.ORB);
-        matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-        img1 = new Mat();
+//        detector = FeatureDetector.create(FeatureDetector.ORB);
+//        descriptor = DescriptorExtractor.create(DescriptorExtractor.ORB);
+//        matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+//        img1 = new Mat();
         try {
             Mat img = Utils.loadResource(this, R.drawable.test);
-            Imgproc.cvtColor(img, img1, Imgproc.COLOR_RGB2GRAY);
-            img1.convertTo(img1, 0);
+//            Imgproc.cvtColor(img, img1, Imgproc.COLOR_RGB2GRAY);
+//            img1.convertTo(img1, 0);
 
-            descriptors1 = new Mat();
-            keyPoint1 = new MatOfKeyPoint();
-            detector.detect(img1, keyPoint1);
-            descriptor.compute(img1, keyPoint1, descriptors1);
+            needToDetect = img.clone();
+            Imgproc.cvtColor(needToDetect, needToDetect, Imgproc.COLOR_RGB2GRAY);
+
+
+//            descriptors1 = new Mat();
+//            keyPoint1 = new MatOfKeyPoint();
+//            detector.detect(img1, keyPoint1);
+//            descriptor.compute(img1, keyPoint1, descriptors1);
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -168,8 +256,15 @@ public class MainActivity extends AppCompatActivity {
 //        match
         MatOfDMatch matches = new MatOfDMatch();
         if (img1.type() == frame.type()) {
-            matcher.match(descriptors1, descriptors2, matches);
+            try {
+                matcher.match(descriptors1, descriptors2, matches);
+            } catch (Exception e) {
+                Log.e(TAG, "detectMyImage: failed");
+                e.printStackTrace();
+            }
         } else {
+            Log.e(TAG, "detectMyImage: return 1");
+            Imgproc.cvtColor(frame, frame, Imgproc.COLOR_GRAY2RGBA);
             return frame;
         }
 
@@ -196,11 +291,14 @@ public class MainActivity extends AppCompatActivity {
         lastMatches.fromList(good_match);
         Mat outImage = new Mat();
         MatOfByte drawnMatches = new MatOfByte();
-        if (frame.empty() || frame.cols() < 1 || frame.rows() < 1)
+        if (frame.empty() || frame.cols() < 1 || frame.rows() < 1) {
+            Imgproc.cvtColor(frame, frame, Imgproc.COLOR_GRAY2RGBA);
+            Log.e(TAG, "detectMyImage: return 2");
             return frame;
+        }
+
 
         Features2d.drawMatches(img1, keyPoint1, frame, keyPoint2, lastMatches, outImage, GREEN, RED, drawnMatches, Features2d.NOT_DRAW_SINGLE_POINTS);
-
         Imgproc.resize(outImage, outImage, frame.size());
         return outImage;
 
